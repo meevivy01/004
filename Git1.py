@@ -93,10 +93,12 @@ if os.path.exists(CLIENTS_PATH):
                 elif not isinstance(CLIENTS_TARGETS[k], list): CLIENTS_TARGETS[k] = [str(CLIENTS_TARGETS[k])]
     except: pass
 
+# --- TARGET CONFIG ---
 TARGET_UNIVERSITIES = ["สวนดุสิต", "Suan Dusit University"]  
 TARGET_FACULTIES = ["เครื่องสำอาง","Cosmetic Science"] 
 TARGET_MAJORS = ["เครื่องสำอาง", "วิทยาศาสตร์เครื่องสำอาง","Cosmetic Science", "Cosmetics", "Cosmetic"]
 SEARCH_KEYWORDS = ["สวนดุสิต เครื่องสำอาง","Cosmetic Suan Dusit"]
+
 
 KEYWORDS_CONFIG = {
     "NPD": {"titles": ["NPD", "R&D", "RD", "Research", "Development", "วิจัย", "พัฒนา", "Formulation", "สูตร"]},
@@ -132,7 +134,7 @@ def analyze_row_department(row):
 
 class JobThaiRowScraper:
     def __init__(self):
-        console.rule("[bold cyan]🛡️ JobThai Scraper (Xvfb Edition)[/]")
+        console.rule("[bold cyan]🛡️ JobThai Scraper (GitHub Actions Optimized)[/]")
         self.history_file = "notification_history_uni.json" 
         self.history_data = {}
         if not os.path.exists(RESUME_IMAGE_FOLDER): os.makedirs(RESUME_IMAGE_FOLDER, exist_ok=True)
@@ -142,34 +144,33 @@ class JobThaiRowScraper:
                 with open(self.history_file, 'r', encoding='utf-8') as f: self.history_data = json.load(f)
             except: self.history_data = {}
 
-        if UserAgent: self.ua = UserAgent(browsers=['chrome'], os=['windows', 'macos'])
-        else: self.ua = None
-
+        # --- Driver Configuration ---
         opts = uc.ChromeOptions()
-        # 🟢 [CRITICAL CHANGE] ลบ headless ออก เพื่อให้รันแบบมีจอ (ผ่าน Xvfb)
-        # opts.add_argument('--headless=new')  <-- ลบทิ้งหรือ Comment ไว้
         
         opts.add_argument('--window-size=1920,1080')
-        opts.add_argument("--no-sandbox")
+        opts.add_argument("--no-sandbox") 
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--disable-popup-blocking")
+        opts.add_argument("--disable-gpu") 
         opts.add_argument("--lang=th-TH")
-        opts.add_argument("--disable-blink-features=AutomationControlled")
-        opts.add_argument("--disable-notifications")
         
-        # เพิ่ม Argument สำหรับ Xvfb ให้เสถียร
-        opts.add_argument("--start-maximized") 
-        
-        fake_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        opts.add_argument(f'--user-agent={fake_user_agent}')
-        
-        try: self.driver = uc.Chrome(options=opts, use_subprocess=True)
-        except: self.driver = uc.Chrome(options=opts, use_subprocess=True)
+        # ✅ ใช้ Static User Agent (ไม่ต้องสุ่มแล้ว เพื่อให้ Cookie ไม่หลุด)
+        my_static_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        opts.add_argument(f'--user-agent={my_static_ua}')
+
+        try:
+            self.driver = uc.Chrome(options=opts, version_main=None) 
+        except Exception as e:
+            console.print(f"⚠️ Driver Init Fail (Retry): {e}", style="yellow")
+            self.driver = uc.Chrome(options=opts)
         
         self.driver.set_page_load_timeout(60) 
         self.wait = WebDriverWait(self.driver, 20)
         self.total_profiles_viewed = 0 
         self.all_scraped_data = []
+        
+        # กำหนดค่า self.ua เป็น None กันเหนียวไว้ก่อน (แม้จะไม่ใช้แล้วก็ตาม)
+        self.ua = None 
 
     def save_history(self):
         if not EMAIL_USE_HISTORY: return
@@ -177,10 +178,9 @@ class JobThaiRowScraper:
             with open(self.history_file, 'w', encoding='utf-8') as f: json.dump(self.history_data, f, ensure_ascii=False, indent=4)
         except: pass
 
+    # 🔴 จุดที่แก้: เปลี่ยนให้ฟังก์ชันนี้ไม่ทำอะไรเลย (pass) เพราะเราใช้ User Agent แบบ Fixed แล้ว
     def set_random_user_agent(self):
-        if self.ua:
-            try: self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": self.ua.random})
-            except: pass
+        pass 
 
     def random_sleep(self, min_t=4.0, max_t=7.0): time.sleep(random.uniform(min_t, max_t))
 
@@ -281,18 +281,14 @@ class JobThaiRowScraper:
     # ==============================================================================
     # 🔥 STEP 1: LOGIN (Xvfb Supported - กดปุ่มได้ชัวร์กว่า)
     # ==============================================================================
-    # ==============================================================================
-    # 🔥 STEP 1 LOGIN: HAMMER CLICK (กดซ้ำๆ จนกว่าฟอร์มจะเปลี่ยน)
-    # ==============================================================================
     def step1_login(self):
         login_url = "https://www.jobthai.com/th/employer"
-        max_retries = 10 
+        max_retries = 5 
         
         for attempt in range(1, max_retries + 1):
-            console.rule(f"[bold cyan]🔐 Login Attempt {attempt}/{max_retries} (Hammer Mode)[/]")
+            console.rule(f"[bold cyan]🔐 Login Attempt {attempt}/{max_retries} (Xvfb Mode)[/]")
             
             try:
-                # 1. Reset
                 if attempt > 1:
                     console.print("   🔄 Refreshing...", style="yellow")
                     try: self.driver.refresh()
@@ -303,120 +299,90 @@ class JobThaiRowScraper:
                     self.driver.set_window_size(1920, 1080)
                     self.driver.get(login_url)
                     self.wait_for_page_load()
-                    self.random_sleep(3, 5)
+                    self.random_sleep(4, 5)
 
-                # 2. เปิดเมนู Login (ถ้ายังไม่มีฟอร์ม)
                 try:
-                    if not self.driver.find_elements(By.CSS_SELECTOR, "#login-form-username"):
-                        menu_sels = ['#menu-jobseeker-login', '.icon-login', 'a[href*="login"]']
+                    self.driver.execute_script("var blockers=document.querySelectorAll('#close-button,.cookie-consent,[class*=\"pdpa\"],[class*=\"popup\"]');blockers.forEach(b=>b.remove());")
+                except: pass
+
+                # 3. Navigation (ActionChains = Human Mouse)
+                # เมื่อรันบน Xvfb เราสามารถใช้ ActionChains ได้เต็มประสิทธิภาพ
+                try:
+                    # A. กดปุ่มเมนู
+                    if not self.driver.find_elements(By.CSS_SELECTOR, "input[type='password']"):
+                        menu_sels = ['#menu-jobseeker-login', 'a[href*="login"]']
                         for sel in menu_sels:
                             try:
-                                btn = WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, sel)))
-                                ActionChains(self.driver).move_to_element(btn).click().perform()
+                                elm = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, sel)))
+                                ActionChains(self.driver).move_to_element(elm).click().perform()
                                 console.print(f"   🖱️ กดเมนูสำเร็จ: {sel}", style="dim")
                                 break
                             except: continue
-                        time.sleep(3) # รอ Popup เด้ง
-                except: pass
-
-                # -----------------------------------------------------------
-                # 🟢 3. THE HAMMER: กดแท็บ Employer ย้ำๆ (แก้จุดตาย)
-                # -----------------------------------------------------------
-                console.print("   🔨 ปฏิบัติการกดแท็บ 'บริษัท'...", style="info")
-                
-                # ตัวเช็คว่าฟอร์มบริษัทมาหรือยัง? (เช็คจาก Placeholder หรือ Text)
-                def is_employer_form_active():
-                    try:
-                        # ลองหา Element ที่มีเฉพาะในฟอร์มบริษัท
-                        # เช่น Link "ลืมรหัสผ่าน" ที่ลิงก์ไป employer
-                        if self.driver.find_elements(By.XPATH, "//a[contains(@href, 'employer') and contains(@href, 'forgot')]"):
-                            return True
-                        # หรือเช็คว่าแท็บ Active ไหม
-                        if self.driver.find_elements(By.CSS_SELECTOR, "li[data-tab='employer'].active"):
-                            return True
-                        return False
-                    except: return False
-
-                # วนลูปกด 5 รอบ (ถ้ายังไม่ Active)
-                tab_selectors = [
-                    "//div[contains(text(), 'บริษัท')]", 
-                    "//*[@id='login_tab_employer']",
-                    "//li[@data-tab='employer']"
-                ]
-                
-                form_ready = False
-                for i in range(5):
-                    if is_employer_form_active():
-                        console.print("   ✅ ฟอร์มบริษัทพร้อมแล้ว! (ไม่ต้องกดซ้ำ)", style="bold green")
-                        form_ready = True
-                        break
+                        self.random_sleep(4, 6)
                     
-                    # ถ้ายังไม่พร้อม.. กด!
-                    for tab_sel in tab_selectors:
+                    # B. กดแท็บ Employer
+                    tab_selectors = ['#login_tab_employer', 'li[data-tab="employer"]']
+                    for sel in tab_selectors:
                         try:
-                            btn = self.driver.find_element(By.XPATH, tab_sel)
-                            # สลับวิธีคลิกในแต่ละรอบ
-                            if i % 2 == 0:
-                                ActionChains(self.driver).move_to_element(btn).click().perform() # Mouse Click
-                            else:
-                                self.driver.execute_script("arguments[0].click();", btn) # JS Click
-                            
-                            console.print(f"   👊 กดแท็บรอบที่ {i+1}...", style="dim")
-                            time.sleep(2) # รอผล
-                            
-                            if is_employer_form_active():
-                                form_ready = True
-                                break
+                            t_elm = WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, sel)))
+                            ActionChains(self.driver).move_to_element(t_elm).click().perform()
+                            console.print("   👉 กดแท็บ Employer สำเร็จ", style="dim")
+                            break
                         except: continue
-                    
-                    if form_ready: break
-                
-                # ถ้ากดจนเหนื่อยแล้วยังนิ่ง.. ใช้ท่าไม้ตาย (JS Force Select)
-                if not form_ready:
-                    console.print("   ⚡ กดไม่ติด.. ใช้ JS บังคับ Active", style="warning")
-                    try:
-                        self.driver.execute_script("""
-                            document.querySelector('#login_tab_jobseeker').classList.remove('active');
-                            document.querySelector('#login_tab_employer').classList.add('active');
-                            document.querySelector('#login_form_jobseeker').style.display = 'none';
-                            document.querySelector('#login_form_employer').style.display = 'block';
-                        """)
-                        time.sleep(2)
-                    except: pass
+                    time.sleep(5) 
 
-                # 4. กรอกรหัส (Input & Submit)
-                console.print("   📝 กำลังกรอกรหัส...", style="info")
-                
-                # รายชื่อช่อง (บางที ID อาจจะเปลี่ยน ถ้า Force Active)
-                user_sels = ["#login-form-username", "input[name='username']", "#username"]
-                pass_sels = ["#login-form-password", "input[name='password']", "#password"]
-                
-                filled = False
-                for us in user_sels:
-                    if self.safe_type(us, MY_USERNAME, By.CSS_SELECTOR, timeout=3):
-                        for ps in pass_sels:
-                            if self.safe_type(ps, MY_PASSWORD, By.CSS_SELECTOR, timeout=2):
-                                try: self.driver.find_element(By.CSS_SELECTOR, ps).send_keys(Keys.ENTER)
-                                except: pass
-                                filled = True
-                                break
-                    if filled: break
-                
-                if filled:
-                    console.print("   ⏳ ส่งข้อมูลแล้ว รอผลลัพธ์...", style="dim")
+                except Exception as e:
+                    console.print(f"   ⚠️ Navigation Warning: {e}", style="dim")
+
+                # 4. Input Scan
+                user_input_found = False
+                user_sels = ["#login-form-username", "input[name='username']", "input[type='email']"]
+                pass_sels = ["#login-form-password", "input[name='password']", "input[type='password']"]
+
+                def scan_and_fill():
+                    for us in user_sels:
+                        if self.safe_type(us, MY_USERNAME, By.CSS_SELECTOR, timeout=3):
+                            for ps in pass_sels:
+                                if self.safe_type(ps, MY_PASSWORD, By.CSS_SELECTOR, timeout=2):
+                                    try: 
+                                        self.driver.find_element(By.CSS_SELECTOR, ps).send_keys(Keys.ENTER)
+                                    except: pass
+                                    return True
+                    return False
+
+                if scan_and_fill():
+                    user_input_found = True
+                else:
+                    iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+                    if iframes:
+                        console.print(f"   👀 สแกน {len(iframes)} Iframes...", style="dim")
+                        for frame in iframes:
+                            try:
+                                self.driver.switch_to.default_content()
+                                self.driver.switch_to.frame(frame)
+                                if scan_and_fill():
+                                    console.print("   ✅ เจอช่องใน Iframe!", style="success")
+                                    user_input_found = True
+                                    break
+                            except: continue
+                        if not user_input_found: self.driver.switch_to.default_content()
+
+                # 5. Check Success
+                if user_input_found:
+                    console.print("   📝 กรอกแล้ว รอตรวจสอบ...", style="info")
                     for _ in range(60):
                         time.sleep(1)
                         if "auth.jobthai.com" not in self.driver.current_url and "login" not in self.driver.current_url:
                             console.print(f"🎉 Login สำเร็จ! (รอบที่ {attempt})", style="bold green")
                             return True
-                else:
-                    console.print("   ❌ หาช่องกรอกไม่เจอ", style="error")
-                    self.driver.save_screenshot(f"login_fail_attempt_{attempt}.png")
+                
+                console.print(f"   ❌ รอบที่ {attempt} ล้มเหลว", style="bold red")
+                self.driver.save_screenshot(f"xvfb_fail_attempt_{attempt}.png")
 
             except Exception as e:
                 console.print(f"   ⚠️ Error รอบที่ {attempt}: {e}", style="warning")
-
-        console.print("🔄 ไม่ไหวแล้ว... ใช้ Cookie Bypass...", style="bold yellow")
+        
+        console.print("🔄 ใช้แผนสำรอง Cookie Bypass...", style="bold yellow")
         return self.login_with_cookie()
 
     def login_with_cookie(self):
@@ -424,23 +390,61 @@ class JobThaiRowScraper:
         if not cookies_env: 
             console.print("❌ ไม่พบ COOKIES_JSON", style="error")
             return False
-        try:
-            self.driver.switch_to.default_content()
-            if "jobthai.com" not in self.driver.current_url:
-                self.driver.get("https://www.jobthai.com/th/employer")
             
+        try:
+            console.print("🍪 กำลังโหลด Cookie...", style="info")
+            
+            # 1. เข้าหน้าเว็บเปล่าๆ ของ Domain นั้นก่อน (สำคัญมาก เพื่อให้ Domain scope ตรงกัน)
+            self.driver.get("https://www.jobthai.com/th/employer")
+            self.random_sleep(2, 3)
+            
+            # 2. ลบ Cookie เดิมที่ติดมากับ Session ใหม่ทิ้งให้หมด
+            self.driver.delete_all_cookies()
+            
+            # 3. แปลงและยัด Cookie
             cookies_list = json.loads(cookies_env)
             for cookie in cookies_list:
-                c = {k: v for k, v in cookie.items() if k in ['name', 'value', 'domain', 'path', 'expiry', 'secure', 'httpOnly']}
-                try: self.driver.add_cookie(c)
-                except: pass
-            self.driver.refresh(); time.sleep(5)
-            self.driver.get("https://www3.jobthai.com/findresume/findresume.php?l=th"); time.sleep(3)
-            if "login" not in self.driver.current_url:
-                console.print("🎉 Login Bypass ด้วย Cookie สำเร็จ!", style="success")
+                # คัดเฉพาะ Key ที่ Selenium รองรับ (ถ้าเอา key แปลกๆ ไปด้วย จะ Error)
+                cookie_dict = {
+                    'name': cookie.get('name'),
+                    'value': cookie.get('value'),
+                    'domain': cookie.get('domain'), # สำคัญ: ต้องตรงกับเว็บที่เปิด
+                    'path': cookie.get('path', '/'),
+                    # 'secure': cookie.get('secure', False), # บางทีใส่ Secure แล้วพัง ถ้าเว็บไม่ strict ให้ comment ออก
+                    # 'expiry': cookie.get('expirationDate') # ไม่ต้องใส่ expiry ก็ได้ ถ้าอยากให้เป็น Session Cookie
+                }
+                
+                # Fix Domain: บางที Cookie มาเป็น .jobthai.com แต่เราเข้า www.jobthai.com
+                # ให้ตัดจุดข้างหน้าออกเพื่อความชัวร์
+                if 'jobthai' in str(cookie_dict['domain']):
+                    try:
+                        self.driver.add_cookie(cookie_dict)
+                    except Exception as e:
+                        # ถ้า add ไม่เข้า ข้ามไป (บางอันเป็น 3rd party cookie)
+                        pass
+            
+            console.print("   ✅ ยัด Cookie เสร็จแล้ว -> Refresh หน้าจอ", style="dim")
+            
+            # 4. Refresh เพื่อให้ Cookie ทำงาน
+            self.driver.refresh()
+            self.wait_for_page_load()
+            self.random_sleep(3, 5)
+
+            # 5. เช็คว่าเข้าได้จริงไหม
+            if "login" not in self.driver.current_url and "dashboard" in self.driver.current_url:
+                console.print("🎉 Bypass Login สำเร็จด้วย Cookie!", style="success")
                 return True
+            else:
+                # ลองไปหน้า Resume โดยตรงอีกทีเพื่อความชัวร์
+                self.driver.get("https://www3.jobthai.com/findresume/findresume.php?l=th")
+                self.random_sleep(2, 3)
+                if "login" not in self.driver.current_url:
+                     console.print("🎉 Bypass Login สำเร็จ! (Check Step 2)", style="success")
+                     return True
+
         except Exception as e:
             console.print(f"❌ Cookie Error: {e}", style="error")
+        
         return False
 
     def step2_search(self, keyword):
