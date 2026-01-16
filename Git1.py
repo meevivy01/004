@@ -541,7 +541,7 @@ class JobThaiRowScraper:
                     console.print(f"      👉 กำลังจัดการช่อง: [cyan]{field_id}[/]", style="dim")
 
                     # --- PHASE 1: Standard Interaction (ลองคลิกธรรมดา 2 ครั้งตามสั่ง) ---
-                    for i in range(2):
+                    for i in range(3):
                         try:
                             # console.print(f"          ⏳ ลองแบบปกติ (Standard) รอบที่ {i+1}...", style="dim")
                             elem.click()
@@ -552,7 +552,7 @@ class JobThaiRowScraper:
                                 filled_success = True
                                 break
                         except: 
-                            time.sleep(0.5)
+                            time.sleep(2)
                     
                     if filled_success: continue # ไป Field ถัดไป
 
