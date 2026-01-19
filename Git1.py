@@ -1586,7 +1586,7 @@ class JobThaiRowScraper:
             console.print(f"❌ Google Sheets Error: {e}", style="error")
 
     def run(self):
-        self.email_report_list = 
+        self.email_report_list = []
         
         ENABLE_BATCH_EMAIL = False  # <--- อยากปิดแก้ตรงนี้เป็น False ครับ[]
         
